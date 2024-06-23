@@ -8,6 +8,7 @@ using System.Web.UI;
 using System.Web.UI.WebControls;
 using BibliotecaLibros.DataAccess;
 using MySql.Data.MySqlClient;
+using BCrypt.Net;
 
 namespace BibliotecaLibros
 {
@@ -51,10 +52,12 @@ namespace BibliotecaLibros
 
         protected void btnRegister_Click(object sender, EventArgs e)
         {
-            string username = txtUsername.Text;
+            string username = txtUsername.Text.Trim();
             string password = txtPassword.Text;
 
-            if (CreateUser(username, password))
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(password);
+
+            if (CreateUser(username, hashedPassword))
             {
                 lblMessage.Text = "Usuario creado exitosamente. Por favor, inicie sesión.";
             }
@@ -73,14 +76,20 @@ namespace BibliotecaLibros
         private bool ValidateUser(string username, string password)
         {
             DatabaseHelper dbHelper = new DatabaseHelper();
-            string query = "SELECT COUNT(*) FROM Users WHERE Username = @Username AND Password = @Password";
-            MySqlParameter[] parameters = {
-                new MySqlParameter("@Username", username),
-                new MySqlParameter("@Password", password)
+            string query = "SELECT Password FROM Users WHERE Username = @Username";
+                    MySqlParameter[] parameters = {
+                new MySqlParameter("@Username", username)
             };
             DataTable result = dbHelper.ExecuteQuery(query, parameters);
-            return result.Rows[0][0].ToString() == "1";
+
+            if (result.Rows.Count == 1)
+            {
+                string hashedPasswordFromDB = result.Rows[0]["Password"].ToString();
+                return BCrypt.Net.BCrypt.Verify(password, hashedPasswordFromDB);
+            }
+            return false;
         }
+
 
         private bool CreateUser(string username, string password)
         {
